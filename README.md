@@ -1,73 +1,230 @@
-# MedPAT:
+<div align="center">
 
-A consent-aware clinical record and case-taking platform for Indian hospitals.
-Built to the Smart India Hackathon "Patient Case-Taking Software" problem
-statement, from the build blueprint in this repo's brief.
+# 🩺 MedPAT
 
-```bash
-npm install
-npm run dev          # http://localhost:3000
-```
+### Your health record, in your pocket — consented, portable, ABDM-ready.
 
-**It runs with zero API keys.** Every external integration sits behind a
-`MOCK_<SERVICE>` flag and the mock path is the default. There is no database to
-provision, no Supabase project to link, and no network call on the demo path.
+*A patient arrives at a new hospital with a plastic bag of paper. The doctor starts from zero.*<br>
+**MedPAT fixes that.**
+
+[![Live Demo](https://img.shields.io/badge/▶_Live_Demo-medpat--live.vercel.app-1f5fd6?style=for-the-badge)](https://medpat-live.vercel.app)
+[![Smart India Hackathon](https://img.shields.io/badge/Smart_India_Hackathon-Patient_Case--Taking-0d9488?style=for-the-badge)](#)
+
+![Next.js](https://img.shields.io/badge/Next.js_15-000000?style=flat-square&logo=nextdotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![React 19](https://img.shields.io/badge/React_19-20232A?style=flat-square&logo=react&logoColor=61DAFB)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_v4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/Postgres_RLS-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+![FHIR R4](https://img.shields.io/badge/FHIR_R4-E5322D?style=flat-square)
+![PWA](https://img.shields.io/badge/PWA-offline-5A0FC8?style=flat-square&logo=pwa&logoColor=white)
+![npm audit](https://img.shields.io/badge/npm_audit-0_vulnerabilities-2ea44f?style=flat-square)
+
+[**Try it**](#-try-it-in-30-seconds) ·
+[**Features**](#-what-it-does) ·
+[**How consent works**](#-consent-not-access) ·
+[**Architecture**](#-architecture) ·
+[**Run locally**](#-run-it-locally) ·
+[**Team**](#-team)
+
+<br>
+
+<a href="https://medpat-live.vercel.app">
+  <img src="public/shots/casesheet.webp" alt="MedPAT doctor console: the structured case sheet with the patient's allergies, medications and recent visits pinned beside it" width="900">
+</a>
+
+<sub>The doctor's structured case sheet — fourteen sections, autosaved, with allergies and medications pinned beside the form.</sub>
+
+</div>
 
 ---
 
-## The idea in one line
+## 💡 The idea in one line
 
-> MedPAT turns the case sheet a doctor already writes on paper into structured,
-> consented, portable health data — so the patient carries their history, the
-> next doctor doesn't start from zero, and the record is ABDM-ready from day one.
+> MedPAT turns the case sheet a doctor already writes on paper into **structured, consented, portable health data** — so the patient carries their history, the next doctor doesn't start from zero, and the record is ABDM-ready from day one.
 
-The patient dashboard is the **consumer surface**. The doctor's structured case
-sheet is the **system of record**. Every patient tab is a read-view over data the
-case sheet produced. That inversion is what makes the app coherent rather than
-seven disconnected features.
+Most teams read *"case-taking software"* as *"hospital dashboard"* and ship a CRUD app with seven tabs. MedPAT inverts it:
 
-## Demo accounts
+| | |
+|---|---|
+| 🧾 **System of record** | The doctor's structured case sheet |
+| 📱 **Consumer surface** | The patient app — every tab is a read-view over what the case sheet produced |
 
-| Role | Sign in with | Notes |
-|---|---|---|
-| Patient | `+919011220001` · code `123456` | Sunita Kale, 58 — diabetes + hypertension, the richest record. Profile locale is **Hindi**, so the app opens in Hindi. |
-| Patient | `+919011220002` · code `123456` | Ramesh Patil, 68 — CKD stage 3, PM-JAY |
-| Patient | `+919011220003` · code `123456` | Aarav Sharma, 8 — asthma, paediatric vital ranges |
-| Doctor | `anita.deshmukh@medpat.in` / `demo1234` | Has today's clinic and two live care relationships |
-| Doctor | `priya.nayak@medpat.in` / `demo1234` | No relationships — use this to demo the request-access flow |
-| Nobody | `/e/EMG-8f2a91c4d7` | The public emergency card. No login. |
+---
 
-`POST /api/demo/reset` restores an identical clean state before each run.
+## 🚀 Try it in 30 seconds
 
-## The three claims the demo defends
+No sign-up, no API keys. Open **[medpat-live.vercel.app](https://medpat-live.vercel.app)** → **Open the live demo**, then pick a door:
 
-**1 · Structure, not text.** Every clinical finding is a typed field with a code
-where a standard exists — ICD-11 for diagnoses, a curated drug master for
-prescriptions, LOINC on export. The case sheet is fourteen sections
-(`src/components/doctor/case-sheet.tsx`), not a notes box.
+<table>
+<tr>
+<th>🧑 Patient — sign in with phone + OTP <code>123456</code></th>
+<th>👩‍⚕️ Doctor — email + password <code>demo1234</code></th>
+</tr>
+<tr valign="top">
+<td>
 
-**2 · Consent, not access.** A doctor does not "have access to patients". A
-doctor has access to *a specific patient, for a bounded window, because a care
-relationship exists*. That relationship is created by exactly three events — the
-patient books, the patient approves an OTP, or an emergency break-glass override
-— and it is enforced in the database, not the UI:
+| Phone | Who |
+|---|---|
+| `+919011220001` | **Sunita Kale** — diabetes + hypertension, richest record, app opens in **Hindi** |
+| `+919011220002` | **Ramesh Patil** — CKD stage 3, PM-JAY |
+| `+919011220003` | **Aarav Sharma**, 8 — asthma, paediatric vital ranges |
+| `+919011220005` | **Joseph D'Souza** |
 
-```sql
-create policy "doctor reads with care relationship" on case_sheets
-  for select using ( has_care_access(patient_id) );
+</td>
+<td>
+
+| Email | Use it to |
+|---|---|
+| `anita.deshmukh@medpat.in` | See today's clinic and open a case sheet |
+| `priya.nayak@medpat.in` | Demo the **request-access** flow — she has no patients yet |
+
+**No login at all:** open a public [emergency card →](https://medpat-live.vercel.app/e/EMG-8f2a91c4d7)
+
+</td>
+</tr>
+</table>
+
+<details>
+<summary><b>🎬 Suggested 2-minute demo path</b> (click to expand)</summary>
+<br>
+
+1. **Patient** `+919011220001` → notice the app opens in Hindi → switch to English.
+2. Open **Records** — one timeline across every hospital. Open a lab report and its trend chart.
+3. **Book** an appointment — read the consent sentence before you confirm.
+4. Open **Who has seen my records** — every access is logged, with a revoke button.
+5. Sign out → **Doctor** `anita.deshmukh@medpat.in` → start a consultation from today's queue.
+6. In the case sheet, type a vital out of range (watch it flag), add a diagnosis (ICD-11 autocomplete), try prescribing a drug the patient is allergic to (it **blocks**, not warns).
+7. Click **View as FHIR** — that's real FHIR R4 JSON.
+8. Sign in as `priya.nayak@medpat.in` → search a patient → padlock. Request access.
+
+</details>
+
+---
+
+## ✨ What it does
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### For patients — seven surfaces, one record
+
+- 🪪 **Profile & health ID card** with an emergency QR
+- 📂 **Records** — one vertical timeline across hospitals, full-text search
+- 📅 **Appointments** — live queue position, calendar export
+- 🗓️ **Booking** — a wizard that can only offer legal slots
+- 🧾 **Billing** — spend by category, PM-JAY utilisation, CSV export
+- 🚑 **Emergency** — ambulance, location, offline first-aid
+- 💚 **Wellness** — a sub-60-second daily check-in
+
+</td>
+<td width="50%" valign="top">
+
+### For doctors — the case sheet is the product
+
+- 📋 **Today's clinic** — live queue, one action per row
+- 🧠 **Fourteen sections** — OLDCARTS grid, tri-state exam findings
+- 🔎 **ICD-11 autocomplete** for diagnoses
+- 💊 **Prescription builder** — Indian `1-0-1` notation, allergy conflicts **block**
+- 🔒 **Finalise, then amend** — signed sheets are immutable
+- 🔁 **FHIR R4 export** of any case sheet
+
+</td>
+</tr>
+</table>
+
+<details>
+<summary><b>📸 More screenshots</b></summary>
+<br>
+
+| Patient records | Patient billing |
+|---|---|
+| <img src="public/shots/records.webp" alt="Patient records timeline" width="440"> | <img src="public/shots/billing.webp" alt="Billing with monthly chart and spend by category" width="440"> |
+
+| Doctor's clinic queue | Public emergency card |
+|---|---|
+| <img src="public/shots/queue.webp" alt="Doctor console: today's clinic queue" width="440"> | <img src="public/shots/emergency.webp" alt="Emergency card opened from a QR code, no login" width="200"> |
+
+</details>
+
+---
+
+## 🔐 Consent, not access
+
+> *"What stops a doctor reading any patient's file?"*<br>
+> **Nothing in the interface. The database refuses.**
+
+A doctor never has access to *patients* — only to **a specific patient, for a bounded window, because a care relationship exists**. That relationship is created by exactly three events:
+
+```mermaid
+flowchart LR
+    A["🗓️ Patient books<br/>an appointment"] -->|"access until 30 days<br/>after the visit"| R(("Care<br/>relationship"))
+    B["📲 Patient approves<br/>an OTP request"] -->|"bounded window"| R
+    C["🚨 Emergency QR<br/>break-glass"] -->|"narrow slice · logged<br/>· expires in 6 h"| R
+    R --> P{{"Row-level security<br/>has_care_access()"}}
+    P -->|"✅ allowed"| D["Doctor reads the record"]
+    P -->|"⛔ no relationship"| X["Zero rows · HTTP 403"]
+    D --> L["📝 Audit row the patient<br/>can see — and revoke"]
 ```
 
-Proven in `supabase/migrations/006_governance.sql` and re-proven in the mock
-store's `assertAccess()`. The smoke test asserts a doctor gets HTTP 403 on a case
-sheet outside her relationships and 200 inside them.
+Enforced in Postgres, not in React:
 
-**3 · Continuity, not silos.** ABHA number and address are first-class fields,
-and any case sheet exports as a FHIR R4 document Bundle — Composition, Patient,
-Encounter, Condition, Observation, MedicationRequest, DiagnosticReport,
-AllergyIntolerance. The "View as FHIR" button in the doctor console opens the
-real JSON.
+```sql
+create policy "doctor reads with care relationship"
+  on case_sheets for select
+  using ( has_care_access(patient_id) );
 
-## What is where
+-- nobody deletes a clinical record. Ever.
+-- (no DELETE policy = no DELETE permitted)
+```
+
+<details>
+<summary><b>🧪 How this is verified</b></summary>
+<br>
+
+- Against a real **Postgres 16**: a doctor sees exactly her consented patients, a doctor with no relationship sees zero rows, a patient sees only their own.
+- The `btree_gist` exclusion constraint rejects a double booking with SQLSTATE `23P01`.
+- A finalised case sheet refuses an `UPDATE`.
+- The browser smoke test asserts **HTTP 403** on a case sheet outside a doctor's relationships, and **200** inside them.
+
+</details>
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart TB
+    subgraph Client["📱 Browser (PWA)"]
+        PA["Patient app<br/>7 tabs · EN / HI"]
+        DC["Doctor console<br/>case sheet"]
+        EC["Emergency card<br/>no login"]
+        SW["Service worker<br/>offline shell"]
+    end
+
+    subgraph Next["⚡ Next.js 15 · App Router"]
+        MW["Middleware<br/>role-based route guard"]
+        RSC["Server Components<br/>records render on the server"]
+        SA["Server Actions + API routes"]
+        FH["FHIR R4 exporter"]
+    end
+
+    subgraph Data["🗄️ Data layer"]
+        MS["Mock store (demo)<br/>seeded in-memory data"]
+        PG[("Postgres + RLS<br/>6 migrations")]
+    end
+
+    PA & DC & EC --> MW --> RSC --> SA
+    SA --> MS
+    SA -. "production path" .-> PG
+    SA --> FH
+    SW -. caches .-> PA
+```
+
+> **Demo vs production.** The live demo runs on a **seeded mock store** — no real database, no real patient data. It mirrors the SQL exactly: same access rule, same slot generator, same double-booking rejection, same append-only case sheets. The Postgres migrations in `supabase/` are the production path.
+
+<details>
+<summary><b>📁 What is where</b></summary>
 
 ```
 supabase/
@@ -78,139 +235,113 @@ supabase/
   migrations/005_ancillary.sql     billing, insurance, wellness, emergency
   migrations/006_governance.sql    care_relationships, consent, audit, RLS
   seed.sql                         3 hospitals · 8 doctors · 5 patients · 42 drugs
-  local_shim.sql                   auth.uid() stub, for verifying migrations locally
 
 src/lib/
   db/seed.ts      the same demo world as seed.sql, same UUIDs
-  db/store.ts     the mock store — same access rule, same slot generator,
-                  same double-booking rejection, same append-only case sheet
+  db/store.ts     the mock store — mirrors the SQL rules
   clinical.ts     vital ranges, ICD-11 offline index, drug-interaction checks
   fhir.ts         case sheet → FHIR R4 document Bundle
-  ai.ts           four narrow AI uses, each with an offline template fallback
-  tz.ts           IST wall-clock vs stored UTC — the appointment-bug trap
-  i18n.ts         complete English and Hindi catalogues
+  ai.ts           four narrow AI uses, each with an offline fallback
+  tz.ts           IST wall-clock vs stored UTC
+  i18n.ts         English and Hindi catalogues
 
 src/app/
-  page.tsx        the public marketing site — problem, features, consent, tech
-  start/          the two-door patient/doctor fork
-  patient/        seven tabs: profile, records, appointments, book, billing,
-                  emergency, wellness — plus the access log
-  doctor/         today's queue, patient lookup, the case sheet, doctor profile
-  e/[token]/      the public emergency card
+  page.tsx        public landing page
+  start/          the patient / doctor fork
+  patient/        profile, records, appointments, book, billing, emergency, wellness
+  doctor/         today's queue, patient lookup, case sheet, profile
+  e/[token]/      public emergency card
   verify/[token]/ prescription verification for a pharmacist
 ```
 
-## Verifying it
+</details>
+
+<details>
+<summary><b>🤖 Where AI is used — and where it is not</b></summary>
+<br>
+
+Four narrow, assistive uses: a visit summary, a two-year history synthesis, a plain-language report explainer for patients, and symptom structuring before a visit.
+
+Every output is **labelled as generated** and needs **doctor confirmation** before it enters the record. The model never prescribes, never diagnoses, and never triages an emergency — any red-flag symptom routes straight to the emergency screen.
+
+</details>
+
+<details>
+<summary><b>🇮🇳 ABDM & standards</b></summary>
+<br>
+
+| Standard | How MedPAT uses it |
+|---|---|
+| **ABHA** | Number and address are first-class fields, with an OTP linking flow |
+| **ABDM consent** | Consent artefacts use ABDM's vocabulary — purpose, HI types, date range, expiry |
+| **FHIR R4** | Composition, Patient, Encounter, Condition, Observation, MedicationRequest, DiagnosticReport, AllergyIntolerance |
+| **ICD-11** | Offline index for diagnosis autocomplete |
+
+**Honest scope:** ABDM alignment is implemented to the M1 shapes against a faithful mock. Full certification (three milestones and a CERT-In audit) is a post-hackathon step.
+
+</details>
+
+---
+
+## 💻 Run it locally
+
+**It runs with zero API keys.** Every integration sits behind a `MOCK_<SERVICE>` flag, and the mock path is the default.
+
+```bash
+git clone https://github.com/satvik31-hash/MedPaT.git
+cd MedPaT
+npm install
+npm run dev            # → http://localhost:3000
+```
+
+<details>
+<summary><b>✅ Checks</b></summary>
 
 ```bash
 npm run typecheck                  # tsc --noEmit
-npm run build && npm start         # production build, 32 routes
+npm run build && npm start         # production build
 
 npx playwright install chromium    # once
-npm run smoke                      # 31 end-to-end assertions
+npm run smoke                      # end-to-end browser test of the whole demo path
 ```
 
-`smoke.mjs` drives the whole demo path in a real browser: OTP login, the Hindi
-locale and the language switch, the timeline, the analyte trend chart, the slot
-grid, the consent sentence, booking, the access log, the public emergency card
-(and what it must *not* leak), the doctor queue, a locked patient, the case
-sheet, live vital flagging, ICD-11 autocomplete, the allergy block, autosave,
-finalise, the FHIR export, and the 403 on a record outside the relationship.
+`POST /api/demo/reset` restores an identical clean demo state.
 
-The SQL is verified separately against a real Postgres 16:
+</details>
 
-```bash
-psql -f supabase/local_shim.sql -f supabase/migrations/001_identity.sql ... -f supabase/seed.sql
-```
+---
 
-That run confirms `available_slots()` emits only legal slots, the `btree_gist`
-exclusion constraint rejects a double booking with SQLSTATE `23P01`, a finalised
-case sheet refuses an UPDATE, and — with a non-superuser role and a JWT claim
-set — a doctor sees exactly her consented patients and nobody else's.
+## 👥 Team
 
-## Working on this with an AI agent
+<table>
+<tr>
+<td align="center" width="25%">
+<a href="https://github.com/satvik31-hash"><img src="https://github.com/satvik31-hash.png" width="90" style="border-radius:50%" alt="Satvik Saxena"><br><b>Satvik Saxena</b></a><br>
+<sub>Team lead</sub>
+</td>
+<td align="center" width="25%">
+<a href="https://github.com/Fazal7268"><img src="https://github.com/Fazal7268.png" width="90" alt="Mohd Fazal Abbas Khan"><br><b>Mohd Fazal Abbas Khan</b></a><br>
+<sub>Demo database setup</sub>
+</td>
+<td align="center" width="25%">
+<a href="https://github.com/sourajit-ayush"><img src="https://github.com/sourajit-ayush.png" width="90" alt="Sourajit Kundu"><br><b>Sourajit Kundu</b></a><br>
+<sub>Product features</sub>
+</td>
+<td align="center" width="25%">
+<a href="https://github.com/RITHWIK2007-SPEC"><img src="https://github.com/RITHWIK2007-SPEC.png" width="90" alt="Rithwik"><br><b>Rithwik</b></a><br>
+<sub>APIs</sub>
+</td>
+</tr>
+</table>
 
-`AGENTS.md` is the source of truth for how this codebase works and what must not
-break — the consent model, the append-only records, the IST/UTC rule, the narrow
-emergency slice. Cursor loads it via `.cursor/rules/medpat.mdc`; Claude Code and
-other agents read `AGENTS.md` directly.
+---
 
-`CURSOR-PROMPTS.md` has ready-to-paste prompts for the remaining work.
+<div align="center">
 
-## Dependency hygiene
+**The record is already written. It just needs to travel.**
 
-`npm audit` reports **0 vulnerabilities**. Two things keep it there:
+[![Open the live demo](https://img.shields.io/badge/Open_the_live_demo_→-1f5fd6?style=for-the-badge)](https://medpat-live.vercel.app)
 
-- `next` is pinned to `^15.5.24`. Earlier 15.1.x carries CVE-2025-66478.
-- `overrides: { "postcss": "^8.5.23" }` in `package.json` patches the copy of
-  postcss that Next bundles, without forcing a jump to Next 16.
+<sub>Built for the Smart India Hackathon · Patient Case-Taking Software</sub>
 
-`recharts@2.15.4` prints a deprecation warning on install. It is a deprecation,
-not an advisory — v3 is a breaking API change and is not worth taking before a
-demo. Leave it.
-
-**Never run `npm audit fix --force`.** It installs outside the stated ranges and
-will break the build. Pin the specific version instead, as above.
-
-## Wiring it to a real Supabase project
-
-The mock store and the SQL describe the same world, so the swap is mechanical.
-
-1. `npx supabase init && npx supabase link --project-ref <ref>` — create the
-   project in **ap-south-1 (Mumbai)**. Round-trip latency from a judging venue in
-   India to a US-East database is the difference between "snappy" and "laggy", and
-   it is a free choice you make once and cannot change later.
-2. `npx supabase db push` then `npx supabase db reset` to apply the migrations
-   and the seed.
-3. Create the storage buckets: `avatars` (public), and `reports`, `films`,
-   `prescriptions`, `insurance` — all private.
-4. Enable phone auth (SMS provider) and email auth. Set the site URL and redirect
-   URLs for both localhost and the deployed domain.
-5. Fill `.env.local` from `.env.example` and set `MOCK_DB=false`.
-6. `npx supabase gen types typescript --linked > src/lib/database.types.ts` and
-   check it against `src/lib/types.ts`.
-
-`src/lib/auth.ts` is the only file that knows how a session is established;
-swapping the demo cookie for `@supabase/ssr` is a change to that file and the
-middleware's role claim.
-
-## Honest scope
-
-Some things here are demonstrated rather than production-certified, and saying so
-plainly is better than being caught:
-
-- **ABDM.** The M1 shapes are implemented — ABHA number and address as first-class
-  fields, a linking flow by OTP against the sandbox or a faithful mock, consent
-  artefacts modelled in ABDM's vocabulary, and FHIR R4 export. M2 and M3 are an
-  integration rather than a rewrite. Production certification needs a CERT-In
-  security audit, which is a post-hackathon step.
-- **AI.** Four narrow, assistive uses: case summary, history synthesis, report
-  explainer, symptom structuring. Every output is visibly labelled as generated
-  and requires doctor confirmation before entering the record. The model never
-  prescribes, never diagnoses, and never triages an emergency — a red-flag symptom
-  string short-circuits to the emergency screen before a request is made. With no
-  API key it runs on deterministic offline templates built from the real record.
-- **OCR.** Report analytes are pre-extracted in the seed. The pipeline
-  (`documents.extracted_values`) is real; the extractor is not wired in this build.
-- **PDF.** Prescriptions print through a print stylesheet and the browser's own
-  "Save as PDF" rather than a renderer dependency — fewer moving parts, and it
-  honours the letterhead layout exactly.
-- **i18n.** The patient surface is complete in English and Hindi. Doctor-facing
-  clinical vocabulary stays in English, which is what Indian doctors actually use.
-  A third language is a file in `src/lib/i18n.ts`, not a refactor.
-
-## Design notes
-
-Two portals, one system, different temperatures. The patient app is calm and one
-type-step larger; the doctor console is dense and information-first. Same tokens,
-different density.
-
-Semantic colour is reserved for clinical meaning — if red appears anywhere that
-is not a warning, the warning stops working — and status is never carried by
-colour alone. Chart hues are a separate, validated palette: both the light and
-dark sets pass a lightness band, chroma floor, adjacent-pair separation under
-deuteranopia and tritanopia, and contrast against the chart surface.
-Dark mode is its own set of steps, not an automatic flip.
-
-Skeleton loaders rather than spinners; empty states carry an action; every
-destructive action confirms, and cancelling an appointment asks why.
+</div>
