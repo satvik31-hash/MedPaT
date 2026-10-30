@@ -395,9 +395,9 @@ export default function Home() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
             ["Satvik Saxena", "Team lead"],
+            ["Mohd Fazal Abbas Khan", "Demo database setup"],
             ["Sourajit Kundu", "Product features"],
-            ["Sourajit Kundu", "Product features"],
-            ["Sourajit Kundu", "Product features"],
+            ["Team member", "Role"],
           ].map(([name, role], i) => (
             <div key={i} className="card p-5">
               <span className="icon-chip w-11 h-11 !rounded-full font-semibold mb-3">
