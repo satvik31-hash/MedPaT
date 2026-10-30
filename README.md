@@ -1,4 +1,4 @@
-# MedPAT
+# MedPAT:
 
 A consent-aware clinical record and case-taking platform for Indian hospitals.
 Built to the Smart India Hackathon "Patient Case-Taking Software" problem
